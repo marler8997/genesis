@@ -1,0 +1,12 @@
+{
+"in":[],
+"ops":[
+
+{
+  "fetchArchive":"https://www.python.org/ftp/python/3.7.3/python-3.7.3-embed-amd64.zip",
+  "hash":""
+}
+
+]
+}
+

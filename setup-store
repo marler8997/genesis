@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -e
+sudo ./gen setup-store
+sudo chown -R $USER /g

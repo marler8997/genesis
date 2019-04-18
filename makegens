@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+import os
+import sys
+#import platform
+import shutil
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(script_dir, "py"))
+
+import log
+import genesis
+import proc
+
+out_dir = os.path.join(script_dir, "gens")
+
+#def system_is_32():
+#    return platform.architecture()[0] == "32bit"
+#def system_is_64():
+#    return platform.architecture()[0] == "64bit"
+
+def make_local_gen_obj_filename(gen_obj):
+    return os.path.join(out_dir, genesis.make_hash_name(gen_obj.get_hash(), gen_obj.name))
+
+class GenObjectSet:
+    def __init__(self):
+        self.map = {}
+        self.alias_map = {}
+    def try_get(self, name):
+        return self.map.get(name)
+    def get(self, name):
+        obj = self.map.get(name)
+        if not obj:
+            sys.exit("Error: package '{}' does not exist".format(name))
+        return obj
+    def set_alias(self, name, value):
+        if name in self.alias_map:
+            sys.exit("Error: multiple values set to alias '{}'".format(name))
+        self.alias_map[name] = value
+    def get_alias(self, name):
+        return self.alias_map[name]
+    def add(self, **kwargs):
+        name = kwargs['name']
+        in_names = kwargs['in_names']
+        ops = kwargs['ops']
+
+        in_list = []
+        for in_name in in_names:
+            gen_obj = self.try_get(in_name)
+            if not gen_obj:
+                sys.exit("Error: cannot create genesis object '{}' because in '{}' doesn't exist".format(
+                    name, in_name))
+            in_list.append(genesis.make_hash_name(gen_obj.get_hash(), in_name))
+        gen_obj = genesis.GenesisObject.from_data(name, {'in':in_list, 'ops':ops})
+        self.map[name] = gen_obj
+        return gen_obj
+    def make_files(self):
+        log.mkdirs_if_needed(out_dir)
+        basename_set = {}
+        for _,gen_obj in self.map.items():
+            filename = make_local_gen_obj_filename(gen_obj)
+            basename_set[os.path.basename(filename)] = True
+            if os.path.exists(filename):
+                log.verbose("{} (already exists)".format(filename))
+            else:
+                tmp = filename + ".tmp"
+                with open(tmp, "w") as file:
+                    file.write(gen_obj.get_hashdata())
+                log.rename(tmp, filename)
+                log.log("{} (created)".format(filename))
+        for entry_base in os.listdir(out_dir):
+            if not entry_base in basename_set:
+                entry = os.path.join(out_dir, entry_base)
+                log.log("{} (removed)".format(entry))
+                os.remove(entry)
+
+obj_set = GenObjectSet()
+
+#
+# Helper Functions
+#
+def make_rpath(*ins):
+    result = ''
+    prefix = ''
+    for in_name in ins:
+        result += "{}@{}/lib".format(prefix, in_name)
+        prefix = ':'
+    return result
+
+
+def include_file(path):
+    if os.path.sep != '/':
+        path = path.replace('/', os.path.sep)
+    with open(os.path.join(script_dir, path), "r") as file:
+        try:
+            exec(file.read())
+        except Exception as e:
+            print("Error in file '{}'".format(file.name))
+            raise
+
+
+obj_set.add(name='hello', in_names=[], ops=[
+    {'op':'makeFile', 'path':'@tmpout/Hello.txt', 'content':'Hello Genesis!', 'makeDirs':True}
+])
+obj_set.add(name='need-hello', in_names=['hello'], ops=[
+    {'op':'makeFile', 'path':'@tmpout/NeedHello.txt', 'content':'This package was built with "hello" as an in.', 'makeDirs':True}
+])
+
+include_file("pkgs/python.py")
+include_file("pkgs/genesis.py")
+
+if os.name == "nt":
+    pass
+else:
+    obj_set.set_alias('deb_mirror', 'http://mirrors.kernel.org/ubuntu')
+
+include_file("pkgs/libc.py")
+include_file("pkgs/gnumake.py")
+include_file("pkgs/gcc.py")
+include_file("pkgs/dmc.py")
+
+if os.name == "nt":
+    obj_set.add(name="clang-8.0.0-prebuilt-win64", in_names=[], ops=[
+        {'op':'fetchArchive',
+         'url':'http://releases.llvm.org/8.0.0/LLVM-8.0.0-win64.exe',
+         'hash':'',
+         'to':'@stage'},
+    ])
+else:
+    include_file("pkgs/linux/build-essential.py")
+    include_file("pkgs/linux/patchelf.py")
+
+include_file("pkgs/dmd.py")
+
+args = sys.argv[1:]
+new_args_length = 0
+
+gen_forward = [os.path.join(script_dir, "gen")]
+for i in range(0, len(args)):
+    arg = args[i]
+    if not arg.startswith("-"):
+        args[new_args_length] = arg
+        new_args_length += 1
+    elif arg == "--keep-stage":
+        genesis.global_keep_stage = True
+        gen_forward.append("--keep-stage")
+    elif arg == "--verbose":
+        log.verbose_enabled = True
+        gen_forward.append("--verbose")
+    else:
+        sys.exit("Error: unknown option '{}'".format(arg))
+
+args = args[:new_args_length]
+
+if len(args) == 0:
+    print('''Usage: makegens COMMAND ARGS...
+
+Commands:
+  generate             Generate the genesis object files
+  list                 List all the genesis object names
+  get <name>           Get the genesis object file for the given name
+  add-build <name>     Generate the genesis object, add and build it
+  make-env <names>...  Make an enviroment with a set of packages
+''')
+    sys.exit(1)
+
+def enforce_args(command, expected, actual):
+    if len(expected) != len(actual):
+        if len(actual) == 0:
+            sys.exit("Usage: {} {}".format(command, " ".join(expected)))
+        sys.exit("Error: the '{}' command requires {} {} ({}) but got {}".format(
+            command, len(expected), "arg" if (len(expected) == 1) else "args", " ".join(expected), len(args)))
+
+command = args[0]
+args = args[1:]
+
+
+if command == "g" or command == "generate":
+    enforce_args(command, [], args)
+    obj_set.make_files()
+elif command == "l" or command == "list":
+    enforce_args(command, [], args)
+    for name,gen_obj in obj_set.map.items():
+        print(name)
+elif command == "get":
+    enforce_args(command, ["<name>"], args)
+    name = args[0]
+    gen_obj = obj_set.get(name)
+    print(make_local_gen_obj_filename(gen_obj))
+elif command == "add-build" or command == "ab":
+    enforce_args(command, ["<name>"], args)
+    name = args[0]
+    gen_obj = obj_set.try_get(name)
+    if not gen_obj:
+        sys.exit("Error: name '{}' does not exist".format(name))
+    obj_set.make_files()
+    proc.run_no_check(proc.python_args() + gen_forward + ["add-build", make_local_gen_obj_filename(gen_obj)])
+elif command == "make-env":
+    if len(args) == 0:
+        sys.exit("Error: make-env requires 1 or more packages")
+    addbuild_args = ["add-build"]
+    makeenv_args = ["make-env"]
+    for name in args:
+        gen_obj = obj_set.get(name)
+        addbuild_args.append(make_local_gen_obj_filename(gen_obj))
+        makeenv_args.append(gen_obj.get_out_store_path())
+    obj_set.make_files()
+    proc.run_no_check(proc.python_args() + gen_forward + addbuild_args)
+    proc.run_no_check(proc.python_args() + gen_forward + makeenv_args)
+else:
+    sys.exit("Error: unknown command '{}'".format(command))

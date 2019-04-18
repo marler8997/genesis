@@ -1,0 +1,121 @@
+if os.name == "nt":
+    pass
+else:
+    deb_mirror = obj_set.get_alias("deb_mirror")
+    libc6 = 'libc6-prebuilt-linux64'
+    obj_set.set_alias('libc6', libc6)
+    obj_set.add(name=libc6, in_names=[], ops=[
+        {'op':'mkdir','path':'@tmpout'},
+        {'op':'fetchArchive',
+         'url':deb_mirror + '/pool/main/g/glibc/libc6_2.27-3ubuntu1_amd64.deb',
+         'inHash':'xaanohc3qbsu62l5tuve4ogecz7oqwr5',
+         'outHash':'czl3zqdayqw55ltk73xahu4mifk5o4r4',
+         'to':'@stage/libc6'},
+        {'op':'moveDirEntries','src':'@stage/libc6/data/lib/x86_64-linux-gnu','dst':'@tmpout/lib'},
+        {'op':'fetchArchive',
+         'url':deb_mirror + '/pool/main/g/glibc/libc-dev-bin_2.27-3ubuntu1_amd64.deb',
+         'inHash':'7y3hi6ntv5zr3t6cmqtzjey2252fntje',
+         'outHash':'2m7zdt73l6lsoiajo22si6pbi4b5n5gb',
+         'to':'@stage/libc6-dev-bin'},
+        {'op':'moveDirEntries','src':'@stage/libc6-dev-bin/data/usr/bin','dst':'@tmpout/bin'},
+        {'op':'fixElf','interp':'@finalout/lib/ld-2.27.so','rpath':'@finalout/lib','files':[
+            '@tmpout/bin/rpcgen',
+            '@tmpout/bin/gencat',
+            '@tmpout/bin/sprof',
+            # for some reason these ones can't be patched?
+            #'@tmpout/bin/mtrace',
+            #'@tmpout/bin/sotruss',
+            '@tmpout/lib/libc-2.27.so',
+            '@tmpout/lib/libc.so.6',
+            '@tmpout/lib/libpthread-2.27.so',
+            '@tmpout/lib/libpthread.so.0',
+        ]},
+        {'op':'fixElf','interp':None,'rpath':'@finalout/lib','files':[
+            # for some reason, changing these onec causes a segfault?
+            #'@tmpout/lib/ld-2.27.so',
+            #'@tmpout/lib/ld-linux-x86-64.so.2',
+            '@tmpout/lib/libanl-2.27.so',
+            '@tmpout/lib/libanl.so.1',
+            '@tmpout/lib/libBrokenLocale-2.27.so',
+            '@tmpout/lib/libBrokenLocale.so.1',
+            '@tmpout/lib/libcidn-2.27.so',
+            '@tmpout/lib/libcidn.so.1',
+            '@tmpout/lib/libcrypt-2.27.so',
+            '@tmpout/lib/libcrypt.so.1',
+            '@tmpout/lib/libdl-2.27.so',
+            '@tmpout/lib/libdl.so.2',
+            '@tmpout/lib/libm-2.27.so',
+            '@tmpout/lib/libm.so.6',
+            '@tmpout/lib/libmemusage.so',
+            '@tmpout/lib/libmvec-2.27.so',
+            '@tmpout/lib/libmvec.so.1',
+            '@tmpout/lib/libnsl-2.27.so',
+            '@tmpout/lib/libnsl.so.1',
+            '@tmpout/lib/libnss_compat-2.27.so',
+            '@tmpout/lib/libnss_compat.so.2',
+            '@tmpout/lib/libnss_dns-2.27.so',
+            '@tmpout/lib/libnss_dns.so.2',
+            '@tmpout/lib/libnss_files-2.27.so',
+            '@tmpout/lib/libnss_files.so.2',
+            '@tmpout/lib/libnss_hesiod-2.27.so',
+            '@tmpout/lib/libnss_hesiod.so.2',
+            '@tmpout/lib/libnss_nis-2.27.so',
+            '@tmpout/lib/libnss_nis.so.2',
+            '@tmpout/lib/libnss_nisplus-2.27.so',
+            '@tmpout/lib/libnss_nisplus.so.2',
+            '@tmpout/lib/libpcprofile.so',
+            '@tmpout/lib/libresolv-2.27.so',
+            '@tmpout/lib/libresolv.so.2',
+            '@tmpout/lib/librt-2.27.so',
+            '@tmpout/lib/librt.so.1',
+            '@tmpout/lib/libSegFault.so',
+            '@tmpout/lib/libthread_db-1.0.so',
+            '@tmpout/lib/libthread_db.so.1',
+            '@tmpout/lib/libutil-2.27.so',
+            '@tmpout/lib/libutil.so.1',
+        ]},
+    ])
+    # linux kernel headers for development
+    obj_set.add(name="linux-libc-dev-linux64", in_names=[], ops=[
+        {'op':'fetchArchive',
+         'url':deb_mirror + '/pool/main/l/linux/linux-libc-dev_4.15.0-47.50_amd64.deb',
+         'inHash':'xfojrwus5ac6tiywfmmucycxxln4ogfd',
+         'outHash':'vm7xe7wpid3n6uqh5p2wy6fb5qegn2kf',
+         'to':'@stage'},
+        {'op':'mkdir','path':'@tmpout'},
+        {'op':'moveToDir','src':'@stage/data/usr/include','dst':'@tmpout'},
+    ])
+    obj_set.add(name="libc6-dev-prebuilt-linux64", in_names=[libc6], ops=[
+        {'op':'fetchArchive',
+         'url':deb_mirror + '/pool/main/g/glibc/libc6-dev_2.27-3ubuntu1_amd64.deb',
+         'inHash':'oj6n7g3mdilpychxogu5hfrxoythbvy2',
+         'outHash':'qums2gettl3ftbyesopiqvhokpu2nk2y',
+         'to':'@stage'},
+        {'op':'mkdir','path':'@tmpout'},
+        {'op':'moveToDir','src':'@stage/data/usr/include','dst':'@tmpout'},
+        {'op':'moveToDir','src':'@stage/data/usr/lib','dst':'@tmpout'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libBrokenLocale.so','to':'@'+libc6+'/lib/libBrokenLocale.so.1'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libanl.so'         ,'to':'@'+libc6+'/lib/libanl.so.1'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libcidn.so'        ,'to':'@'+libc6+'/lib/libcidn.so.1'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libcrypt.so'       ,'to':'@'+libc6+'/lib/libcrypt.so.1'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libdl.so'          ,'to':'@'+libc6+'/lib/libdl.so.2'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libmvec.so'        ,'to':'@'+libc6+'/lib/libmvec.so.1'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libnsl.so'         ,'to':'@'+libc6+'/lib/libnsl.so.1'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libnss_compat.so'  ,'to':'@'+libc6+'/lib/libnss_compat.so.2'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libnss_dns.so'     ,'to':'@'+libc6+'/lib/libnss_dns.so.2'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libnss_files.so'   ,'to':'@'+libc6+'/lib/libnss_files.so.2'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libnss_hesiod.so'  ,'to':'@'+libc6+'/lib/libnss_hesiod.so.2'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libnss_nis.so'     ,'to':'@'+libc6+'/lib/libnss_nis.so.2'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libnss_nisplus.so' ,'to':'@'+libc6+'/lib/libnss_nispllus.so.2'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libresolv.so'      ,'to':'@'+libc6+'/lib/libresolv.so.2'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/librt.so'          ,'to':'@'+libc6+'/lib/librt.so.1'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libthread_db.so'   ,'to':'@'+libc6+'/lib/libthread_db.so.1'},
+        {'op':'fixSymlink','path':'@tmpout/lib/x86_64-linux-gnu/libutil.so'        ,'to':'@'+libc6+'/lib/libutil.so.1'},
+        # TODO: need to patch these scripts
+        #       replace /lib/x86_64-linux-gnu with either libc6/lib or finalout/lib or something
+        #{'op':'fixElf','interp':None,'rpath':make_rpath(libc6),'files':[
+        #    '@tmpout/lib/x86_64-linux-gnu/libc.so'
+        #    '@tmpout/lib/x86_64-linux-gnu/libm.so'
+        #    '@tmpout/lib/x86_64-linux-gnu/libpthread.so'
+        #]},
+    ])

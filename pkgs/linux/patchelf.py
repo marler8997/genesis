@@ -1,0 +1,19 @@
+'''
+obj_set.add(name="patchelf64", in_names=["build-essential-prebuilt-linux64"], ops=[
+    {'op':'fetchArchive',
+     'url':'https://github.com/NixOS/patchelf/archive/0.10.tar.gz',
+     'inHash':'4asajumnh6noejmhngrwiy5ewurv77bz',
+     'outHash':'zmxlxdjmjbpr6yznhhwqaza2wamfseg2',
+     'to':'@stage'},
+    {'op':'unwrapDir','path':'@stage/patchelf-0.10'},
+    {'op':'run','cmd':['./bootstrap.sh']},
+    {'op':'run','cmd':['./configure']},
+    {'op':'run','cmd':['make']},
+    {'op':'mkdirs','path':'@tmpout/bin'},
+    {'op':'moveToDir','src':'@stage/src/patchelf','dst':'@tmpout/bin'},
+    {'op':'fixElf',
+     'interp':'@build-essential-prebuilt-linux64/lib/ld-2.27.so',
+     'rpath':'@build-essential-prebuilt-linux64/lib',
+     'files':['@tmpout/bin/patchelf']},
+])
+'''

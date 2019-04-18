@@ -1,0 +1,7 @@
+{
+  "in":[
+  ],
+  "ops":[
+    {"makeFile":"@out/Hello.txt","content":"Hello Genesis!","makeDirs":true}
+  ]
+}

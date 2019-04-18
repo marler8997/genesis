@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+import os
+import sys
+import shutil
+import json
+import glob
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(script_dir, "py"))
+
+import log
+import genesis
+import download
+
+def usage():
+    print('''Usage: gen COMMAND ARGS..."
+
+Common Commands:
+  add-build <gen-file>          Equivalent of 'gen add <file>' and 'gen add <gen-file>'
+  make-env <pkgs>...            Make an enviroment with a set of packages
+
+  add <gen-file>                Add the given gen file and it's dependencies into the store.
+  build <gen-file-store-path>   Build the given genesis file path.  The path must be a path in the store.
+
+
+Less-Common Commands:
+  store <path>                  Install a file/directory into the store. The resulting path will be of the form
+                                /g/ca/<hash>-<basename>
+                                Guaranteed to only print the resulting store path to stdout, nothing else.
+  store-hashed <path>           Install a file/directory into the store whose name already contains it's hash.
+  hash <path>                   Hash a file/directory.
+  dump-hash-data <gen-file>     Dump the hash data for a generation object from the given file.
+  out-hash <gen-file>           Equivalent of ./gen dump-hash-data <gen-file> | ./gen hash -
+
+Network Commands:
+  net-show                      Show the network settings.
+                                These settings should be taken from the system, but also
+                                should be overridable somehow.
+
+Management Commands:
+  setup-store                   Setup the store directory structure
+  clean                         Clean stage directories, tmpouts and extracting directories
+  clean-stage                   Clean all leftover stage directories
+
+Options:
+  --verbose                     Verbose output
+  --keep-stage                  Keep stage directories
+''')
+
+args = sys.argv[1:]
+
+new_args_length = 0
+for i in range(0, len(args)):
+    arg = args[i]
+    if not arg.startswith("-"):
+        args[new_args_length] = arg
+        new_args_length += 1
+    elif arg == "--keep-stage":
+        genesis.global_keep_stage = True
+    elif arg == "--verbose":
+        log.verbose_enabled = True
+    else:
+        sys.exit("Error: unknown option '{}'".format(arg))
+
+args = args[:new_args_length]
+
+if len(args) == 0:
+    usage()
+    sys.exit(1)
+
+command = args[0]
+args = args[1:]
+
+def enforce_args(command, expected, actual):
+    if len(expected) != len(actual):
+        if len(actual) == 0:
+            sys.exit("Usage: {} {}".format(command, " ".join(expected)))
+        sys.exit("Error: the '{}' command requires {} {} ({}) but got {}".format(
+            command, len(expected), "arg" if (len(expected) == 1) else "args", " ".join(expected), len(args)))
+
+def ca_add(path, hash, name):
+    finalout = genesis.make_ca_path(hash, name)
+    if os.path.exists(finalout):
+        log.log("this path is already stored")
+    else:
+        tmpout = finalout + ".tmpout"
+        if os.path.exists(tmpout):
+            sys.exit("Error: need to handle case when tmpout '{}' already exists".format(tmpout))
+        log.log("copying path to temporary location '{}'".format(tmpout))
+        if path_type == genesis.PathType.FILE:
+            shutil.copy2(path, tmpout)
+        else:
+            log.copytree(path, tmpout, symlinks=True)
+        os.rename(tmpout, finalout)
+    log.flush()
+    print(finalout)
+
+
+if command == "make-env":
+    if len(args) == 0:
+        sys.exit("Error: need one or more packages")
+    out_path = genesis.make_env(args)
+    log.flush()
+    print(out_path)
+elif command == "store":
+    enforce_args(command, ["<path>"], args)
+    path = args[0]
+    path_type, hash = genesis.hash_path(path)
+    abspath = os.path.abspath(path)
+    basename = os.path.basename(abspath)
+    ca_add(path, hash, basename)
+elif command == "store-hashed":
+    enforce_args(command, ["<path>"], args)
+    path = args[0]
+    path_type, actual_hash = genesis.hash_path(path)
+    abspath = os.path.abspath(path)
+    basename = os.path.basename(abspath)
+    hash_from_filename, name = genesis.split_hash_name(basename)
+    if actual_hash != hash_from_filename:
+        log.log("Error: filename has incorrect hash, actual hash is:")
+        log.log(actual_hash)
+        sys.exit(1)
+    ca_add(path, actual_hash, name)
+elif command == "add-build" or command == "ab":
+    enforce_args(command, ["<path>"], args)
+    path = args[0]
+    gen_path = genesis.add_gen_obj_from_file(path)
+    out_path = genesis.build(gen_path)
+    log.flush()
+    print(out_path)
+elif command == "add":
+    enforce_args(command, ["<path>"], args)
+    path = args[0]
+    #if not os.path.isfile(path):
+    #    sys.exit("Error: the 'add' command requires a file, not a directory")
+    print(genesis.add_gen_obj_from_file(path))
+elif command == "install-old":
+    enforce_args(command, ["<gen-file>"], args)
+    file = args[0]
+    gen_obj = genesis.GenesisObject.from_file(file)
+    store_path = gen_obj.get_gen_store_path()
+    shutil.copyfile(file, store_path)
+    print(store_path)
+elif command == "build":
+    enforce_args(command, ["<gen-file-store-path>"], args)
+    file = args[0]
+    out_path = genesis.build(file)
+    log.flush()
+    print(out_path)
+elif command == "hash":
+    enforce_args(command, ["<path>"], args)
+    path = args[0]
+    if path == "-":
+        hasher = genesis.GenesisHasher()
+        hasher.start_file_content_hash()
+        while True:
+            data = sys.stdin.buffer.read()
+            if len(data) == 0:
+                break
+            hasher.update(data)
+        print(hasher.finish())
+    else:
+        path_type, hash = genesis.hash_path(path)
+        print(hash)
+elif command == "out-hash":
+    enforce_args(command, ["<gen-file>"], args)
+    file = args[0]
+    gen_obj = genesis.GenesisObject.from_file(file)
+    print(gen_obj.get_hash())
+elif command == "dump-hash-data":
+    enforce_args(command, ["<gen-file>"], args)
+    file = args[0]
+    gen_obj = genesis.GenesisObject.from_file(file)
+    # don't use print, we don't want to add a newline to our hash data
+    sys.stdout.write(gen_obj.get_hashdata())
+elif command == "setup-store":
+    root_path = genesis.get_root_path()
+    paths = [
+        root_path,
+        genesis.get_ca_path(),
+        genesis.get_ca_stage_path(),
+        genesis.get_obj_path(),
+        genesis.get_obj_stage_path(),
+        genesis.get_stage_path(),
+        genesis.get_proxy_path(),
+    ]
+    paths_made = 0
+    for path in paths:
+        if not os.path.exists(path):
+            log.mkdir(path)
+            paths_made += 1
+
+    if paths_made == 0:
+        log.log("the store is already setup at {}".format(root_path))
+    else:
+        log.log("made {} paths".format(paths_made))
+elif command == "net-show":
+    proxy_settings = download.ProxySettings.init()
+    proxies = proxy_settings.proxies
+    if len(proxies) == 0:
+        print("no proxies")
+    else:
+        print("{} proxies:".format(len(proxies)))
+        for proto,proxy in proxies.items():
+            print("{:5} '{}'".format(proto, proxy))
+elif command == "clean":
+    def clean(dir, pattern):
+        for entry in glob.glob(os.path.join(dir, pattern)):
+            log.rmtree(os.path.join(dir, entry))
+    log.verbose_enabled = True
+    clean(genesis.get_stage_path(), "*")
+    clean(genesis.get_ca_stage_path(), "*")
+    clean(genesis.get_obj_stage_path(), "*")
+    clean(genesis.get_root_path(), "*.tmpout")
+else:
+    sys.exit("Erro: unknown command '{}'".format(command))
