@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#
+# Install build tools in order to bootstrap the genesis build tools
+#
+pkgs=(
+    automake
+    autoconf
+    gnumake
+    bash
+    gnused
+    python37
+    m4
+    bison
+    binutils
+    gcc8
+)
+pkg_attr_names=()
+for pkg in ${pkgs[@]}; do
+    pkg_attr_names+=("nixos.$pkg")
+done
+nix-env -iA ${pkg_attr_names[@]}

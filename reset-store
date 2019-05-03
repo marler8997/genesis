@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -ex
+./clean-store
+sudo PATH=$PATH ./gen setup-store
+sudo PATH=$PATH chown -R $USER /g

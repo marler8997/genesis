@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+import genobjset
+
+assert None == genobjset.try_get_package_host_alias_impl('-linux64', 'a')
+assert None == genobjset.try_get_package_host_alias_impl('-linux64', 'a-linux64a')
+assert None == genobjset.try_get_package_host_alias_impl('-linux64', 'a-cross-linux64')
+assert 'a' == genobjset.try_get_package_host_alias_impl('-linux64', 'a-linux64')
+assert 'a-foo' == genobjset.try_get_package_host_alias_impl('-linux64', 'a-linux64-foo')
+
+list = []
+def make_foo_package(*, version, libc, build_type):
+    return {'version':version,'libc':libc,'build_type':build_type}
+
+options = {
+    'version':['1.0','1.1'],
+    'libc':['musl','glibc'],
+    'build_type':['debug','release'],
+}
+
+def print_array(array):
+    for item in array:
+        print(item)
+
+genobjset.add_variations(list, make_foo_package, options)
+print("--------------------------------------------------------------------------------")
+print_array(list)
+
+
+def make_bar_package():
+    return {'bar':'bar'}
+list2 = []
+genobjset.add_variations(list2, make_bar_package, {})
+print("--------------------------------------------------------------------------------")
+print_array(list2)

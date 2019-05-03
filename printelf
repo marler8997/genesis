@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -e
+patchelf=/g/*patchelf*/bin/patchelf
+interp=$($patchelf --print-interpreter $1 || echo "")
+echo $1
+echo "interpreter: \"$interp\""
+rpath=$($patchelf --print-rpath $1)
+echo "rpath: \"$rpath\""
+echo "----------------------------------"
+readelf -d $1 | grep "library"

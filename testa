@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+import os
+import sys
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(script_dir, "py"))
+
+import log
+import genesis
+import proc
+
+#log.verbose_enabled = True
+
+gen = os.path.join(script_dir, "gen")
+local_obj_dir = os.path.join(script_dir, "o")
+
+if os.path.exists(local_obj_dir):
+    log.rmtree(local_obj_dir)
+proc.py([gen, "generate-obj-files"])
+
+hello = proc.py_output([gen, "get-obj-local-path", "hello"]).rstrip()
+need_hello = proc.py_output([gen, "get-obj-local-path", "need-hello"]).rstrip()
+
+if os.name == "nt":
+    python = proc.py_output([gen, "get-obj-local-path", "python-3.7.3-win64-prebuilt"]).rstrip()
+else:
+    python = proc.py_output([gen, "get-obj-local-path", "python-3.7.3-linux64"]).rstrip()
+
+'''
+# TEST HASHING FUNCTIONS
+./gen dump-hash-data $hello
+hash1=$(./gen dump-hash-data $hello | ./gen hash -)
+hash2=$(./gen out-hash $hello)
+
+if [ ! $hash1 == $hash2 ]; then
+    echo "Error: hashes don't match:"
+    echo $hash1
+    echo $hash2
+    exit 1
+fi
+'''
+
+if os.path.exists(genesis.get_root_path()):
+    if os.name == "nt":
+        log.rmtree(genesis.get_root_path())
+    else:
+        proc.run(proc.sudo_args() + ["rm", "-rf", genesis.get_root_path()])
+proc.run(proc.sudo_args() + proc.python_args() + [gen, "setup-store"])
+if os.name != "nt":
+    proc.run(proc.sudo_args() + ["chown", "-R", os.environ["USER"], genesis.get_root_path()])
+
+path = proc.py_output([gen, "add-obj", hello]).rstrip()
+proc.py([gen, "build", path])
+
+path = proc.py_output([gen, "add-obj", need_hello]).rstrip()
+proc.py([gen, "build", path])
+
+path = proc.py_output([gen, "add-obj", python]).rstrip()
+# not working on linux yet
+if os.name == "nt":
+    python_obj = proc.py_output([gen, "build", path]).rstrip()
+    proc.py([gen, "make-env-obj", python_obj])
