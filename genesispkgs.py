@@ -3,6 +3,8 @@ include_file("pkgs/core.py")
 
 include_file("pkgs/nix.py")
 
+include_file("pkgs/zig.py")
+
 obj_set.add('hello',{'in':[],'ops':[
     {'op':'makeFile', 'path':'@tmpout/Hello.txt', 'content':'Hello Genesis!', 'makeDirs':True}
 ]})

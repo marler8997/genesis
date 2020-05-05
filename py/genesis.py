@@ -458,6 +458,9 @@ class GenesisObject:
             if self.ifaces:
                 for iface in self.ifaces:
                     iface_path = os.path.join(tmpout, "genesis", "i", iface)
+                    if os.name == 'nt':
+                        # TODO: for now we only support bat files here
+                        iface_path += '.bat'
                     if not os.path.exists(iface_path):
                         raise Exception("genesis object '{}' implements interface '{}' but did not create file '{}'".format(
                             self.name, iface, iface_path))

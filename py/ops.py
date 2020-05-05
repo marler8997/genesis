@@ -48,6 +48,8 @@ class OpExecutor:
             mkdirs(op)
         elif name == 'symlink':
             symlinkOp(op)
+        elif name == 'exelink':
+            exelinkOp(op)
         elif name == 'fixSymlink':
             fixSymlinkOp(op)
         elif name == 'move':
@@ -82,6 +84,11 @@ class OpExecutor:
             runMakeOp(self, op, gen_obj.bootstrap)
         else:
             sys.exit("Error: unknown op '{}'".format(name))
+
+def normalizePath(path):
+    if os.name == 'nt':
+        return path.replace('/','\\')
+    return path
 
 def cdOp(op):
     path = op['path']
@@ -135,6 +142,20 @@ def symlinkOp(op):
     path = op['path']
     to = op['to']
     log.symlink(to, path)
+
+def exelinkOp(op):
+    path = normalizePath(op['path'])
+    to = normalizePath(op['to'])
+    if os.name == 'nt':
+        # NOTE: for now just use bat files, but might need to support exes
+        with open(path + ".bat", "w") as file:
+            if not os.path.isabs(to):
+                tostring = "%~dp0" + to
+            else:
+                tostring = to
+            file.write("@" + tostring + " %*")
+    else:
+        log.symlink(to, path)
 
 def fixSymlinkOp(op):
     path = op['path']

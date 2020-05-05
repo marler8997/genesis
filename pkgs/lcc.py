@@ -114,21 +114,23 @@ add_lcc('4_2', True,
 )
 '''
 
-obj_set.add_variation_set('lcc', lcc_template).add({
-    'version':['4_2'],
-    #'binutils':[obj_set.alias_to_hash_name('binutils-cross-linux32-linux64-prebuilt')],
-    'binutils':[obj_set.get_variation('binutils-cross-linux32', platform='linux32')],
-    'libc':[obj_set.get_variation('musl', platform='linux32')],
-    'libc_dev':[obj_set.get_variation('musl-dev', platform='linux32')],
-})
+# commented out because can't find binutils variation on windows
+#obj_set.add_variation_set('lcc', lcc_template).add({
+#    'version':['4_2'],
+#    #'binutils':[obj_set.alias_to_hash_name('binutils-cross-linux32-linux64-prebuilt')],
+#    'binutils':[obj_set.get_variation('binutils-cross-linux32', platform='linux32')],
+#    'libc':[obj_set.get_variation('musl', platform='linux32')],
+#    'libc_dev':[obj_set.get_variation('musl-dev', platform='linux32')],
+#})
 
-obj_set.add_variation_set('lcc-bootstrap', lcc_template).add({
-    'version':['4_2'],
-    #'binutils':[obj_set.alias_to_hash_name('binutils-cross-linux32-linux64-prebuilt')],
-    'binutils':[obj_set.get_variation('binutils-cross-linux32', platform='linux32')],
-    'libc':[obj_set.get_variation('musl', platform='linux32')],
-    'libc_dev':[obj_set.get_variation('musl-dev', platform='linux32')],
-})
+# commented out because can't find binutils variation on windows
+#obj_set.add_variation_set('lcc-bootstrap', lcc_template).add({
+#    'version':['4_2'],
+#    #'binutils':[obj_set.alias_to_hash_name('binutils-cross-linux32-linux64-prebuilt')],
+#    'binutils':[obj_set.get_variation('binutils-cross-linux32', platform='linux32')],
+#    'libc':[obj_set.get_variation('musl', platform='linux32')],
+#    'libc_dev':[obj_set.get_variation('musl-dev', platform='linux32')],
+#})
 
 
 
